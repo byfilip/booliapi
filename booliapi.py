@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import itertools
+import os
 import json
-import operator
+import time
 import random
-import re
 import string
 import urllib2
-from datetime import datetime
+import operator
+import itertools
 from hashlib import sha1
 from urllib import urlencode
+from datetime import datetime
 
 __version__ = "0.0"
 
@@ -35,7 +36,7 @@ _field_types = {
     "size": _float, "lot_size": _float, "rooms": _float,
     "lat": _float, "lon": _float,
     "id": _int, "fee": _int, "price": _int,
-    "created": lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S"),
+    "published": lambda x: datetime.strptime(x, "%Y-%m-%d %H:%M:%S"),
    }
 
 filterops = {
@@ -153,31 +154,50 @@ class ResultSet(list):
                 for key, group in itertools.groupby(self, key=F(key))]
 
 class BooliAPI(object):
-    base_url = "http://api.booli.se/listing/"
+    base_url = "http://api.booli.se/listings"
 
-    def __init__(self, caller_id, key):
+    def __init__(self, caller_id=None, key=None):
+        if not caller_id or not key:
+            d = self._load_user()
+            caller_id = caller_id or d.get('caller_id')
+            key = key or d.get('key')
+
+            if not caller_id or not key:
+                raise ValueError("caller_id or key not given, and no "
+                                 "default found in ~/.boolirc")
+
         self.caller_id = caller_id
         self.key = key
-        
+
+    def _load_user(self):
+        try:
+            f = open(os.path.expanduser("~/.boolirc"), "rb")
+        except IOError:
+            return {}
+
+        try:
+            return json.load(f)
+        finally:
+            f.close()
+
     def search(self, area="", **params):
         url = self._build_url(area, params)
-        response = urllib2.urlopen(url)
-        data = json.load(response)
-        content = data["booli"]["content"]
+        req = urllib2.Request(url, headers={"Accept": "application/vnd.booli-v2+json"})
+        response = urllib2.urlopen(req)
+        content = json.load(response)
         resultset = ResultSet([Listing(item) for item in content["listings"]])
-        resultset.total_count = content["totalListingCount"]
+        resultset.total_count = content["totalCount"]
         return resultset
 
     def _build_url(self, area, params):
         """Return a complete API request URL for the given search
         parameters, including the required authentication bits."""
-        time = datetime.now().replace(microsecond=0).isoformat()
+        t = str(int(time.time()))
         unique = "".join(random.choice(string.letters + string.digits)
                          for _ in range(16))
-        hash = sha1(self.caller_id + time + self.key + unique).hexdigest()
-        params.update(callerId=self.caller_id, time=time, unique=unique,
-                      hash=hash, format="json")
-        return self.base_url + area + "?" + smart_urlencode(params)
+        hash = sha1(self.caller_id + t + self.key + unique).hexdigest()
+        params.update(q=area, callerId=self.caller_id, time=t, unique=unique, hash=hash)
+        return self.base_url + "?" + smart_urlencode(params)
 
 
 class Listing(object):
