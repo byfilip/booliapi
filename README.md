@@ -9,6 +9,14 @@ from booliapi import BooliAPI
 Booli = BooliAPI("your username", "your api key")
 ```
 
+For convenience, these can also be stored in `~/.boolirc` as JSON:
+
+```json
+{"caller_id": "your username", "key": "your api key"}
+```
+
+Then simply omit the arguments, so `Booli = BooliAPI()`.
+
 ## Searching
 
 `Booli.search()` performs a search and returns a list of `Listing`s.

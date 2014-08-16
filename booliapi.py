@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import itertools
+import os
 import json
-import operator
 import random
 import string
 import urllib2
-from datetime import datetime
+import operator
+import itertools
 from hashlib import sha1
 from urllib import urlencode
+from datetime import datetime
 
 __version__ = "0.0"
 
@@ -154,9 +155,29 @@ class ResultSet(list):
 class BooliAPI(object):
     base_url = "http://api.booli.se/listing/"
 
-    def __init__(self, caller_id, key):
+    def __init__(self, caller_id=None, key=None):
+        if not caller_id or not key:
+            d = self._load_user()
+            caller_id = caller_id or d.get('caller_id')
+            key = key or d.get('key')
+
+            if not caller_id or not key:
+                raise ValueError("caller_id or key not given, and no "
+                                 "default found in ~/.boolirc")
+
         self.caller_id = caller_id
         self.key = key
+
+    def _load_user(self):
+        try:
+            f = open(os.path.expanduser("~/.boolirc"), "rb")
+        except IOError:
+            return {}
+
+        try:
+            return json.load(f)
+        finally:
+            f.close()
         
     def search(self, area="", **params):
         url = self._build_url(area, params)
