@@ -5,7 +5,6 @@ import itertools
 import json
 import operator
 import random
-import re
 import string
 import urllib2
 from datetime import datetime
